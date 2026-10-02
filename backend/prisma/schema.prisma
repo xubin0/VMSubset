@@ -1,0 +1,364 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Vendor {
+  id             Int       @id @default(autoincrement())
+  vendorName     String
+  vendorType     String?
+  status         String    @default("ACTIVE")
+  country        String?
+  website        String?
+  riskRating     String?
+  paymentTerms   String?
+  currency       String?
+  taxId          String?
+  erpVendorCode  String?
+  onboardingDate DateTime?
+  lastUpdated    DateTime  @updatedAt
+
+  contacts       VendorContact[]
+  vendorProducts VendorProduct[]
+  rfqVendors     RFQVendor[]
+  quotes         Quote[]
+  contracts      Contract[]
+  purchaseOrders PurchaseOrder[]
+}
+
+model VendorContact {
+  id             Int     @id @default(autoincrement())
+  vendorId       Int
+  name           String
+  role           String?
+  email          String?
+  phone          String?
+  department     String?
+  primaryContact Boolean @default(false)
+  notes          String?
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+model ProductCategory {
+  id               Int     @id @default(autoincrement())
+  categoryName     String
+  parentCategoryId Int?
+  description      String?
+
+  parentCategory  ProductCategory?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: SetNull)
+  childCategories ProductCategory[] @relation("CategoryHierarchy")
+  products        Product[]
+  rfqs            RFQ[]
+}
+
+model Brand {
+  id                  Int     @id @default(autoincrement())
+  brandName           String
+  manufacturerWebsite String?
+  notes               String?
+
+  products Product[]
+}
+
+model Product {
+  id              Int     @id @default(autoincrement())
+  categoryId      Int?
+  brandId         Int?
+  model           String
+  description     String?
+  specification   String?
+  lifecycleStatus String?
+  notes           String?
+
+  category           ProductCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand              Brand?              @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  vendorProducts     VendorProduct[]
+  rfqItems           RFQItem[]
+  quotes             Quote[]
+  contractItems      ContractItem[]
+  purchaseOrderLines PurchaseOrderLine[]
+}
+
+model VendorProduct {
+  id                 Int     @id @default(autoincrement())
+  vendorId           Int
+  productId          Int
+  authorisedReseller Boolean @default(false)
+  leadTimeDays       Int?
+  warrantyMonths     Int?
+  moq                Int?
+  notes              String?
+
+  vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, productId])
+}
+
+model RFQ {
+  id                    Int       @id @default(autoincrement())
+  rfqNumber             String    @unique
+  requestDate           DateTime  @default(now())
+  requestedBy           String
+  categoryId            Int?
+  status                String
+  closingDate           DateTime?
+  businessJustification String?
+
+  category            ProductCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  items               RFQItem[]
+  vendors             RFQVendor[]
+  quotes              Quote[]
+  procurementRequests ProcurementRequest[]
+}
+
+model RFQItem {
+  id                 Int       @id @default(autoincrement())
+  rfqId              Int
+  productId          Int?
+  quantity           Int
+  targetDeliveryDate DateTime?
+  notes              String?
+
+  rfq     RFQ      @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  quotes  Quote[]
+}
+
+model RFQVendor {
+  id             Int       @id @default(autoincrement())
+  rfqId          Int
+  vendorId       Int
+  responseStatus String
+  responseDate   DateTime?
+  notes          String?
+
+  rfq    RFQ    @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([rfqId, vendorId])
+}
+
+model Quote {
+  id           Int      @id @default(autoincrement())
+  rfqId        Int?
+  rfqItemId    Int?
+  vendorId     Int
+  productId    Int
+  quoteDate    DateTime @default(now())
+  quantity     Int
+  unitPrice    Decimal
+  currency     String
+  leadTimeDays Int
+  validityDate DateTime
+  incoterms    String?
+  notes        String?
+
+  rfq     RFQ?     @relation(fields: [rfqId], references: [id], onDelete: SetNull)
+  rfqItem RFQItem? @relation(fields: [rfqItemId], references: [id], onDelete: SetNull)
+  vendor  Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  product Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Contract {
+  id                Int      @id @default(autoincrement())
+  vendorId          Int
+  contractNumber    String   @unique
+  startDate         DateTime
+  endDate           DateTime
+  currency          String
+  totalValue        Decimal
+  billingFrequency  String   @default("ONE_TIME")
+  paymentTerms      String
+  businessOwner     String
+  status            String
+  renewalNoticeDays Int
+  notes             String?
+
+  vendor              Vendor               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items               ContractItem[]
+  purchaseOrders      PurchaseOrder[]
+  procurementRequests ProcurementRequest[]
+}
+
+model ProcurementRequest {
+  id            Int      @id @default(autoincrement())
+  requestNumber String   @unique
+  department    String
+  requestedBy   String
+  purpose       String
+  businessNeed  String
+  budgeted      Boolean
+  costCenter    String
+  status        String   @default("OPEN")
+  submittedAt   DateTime @default(now())
+  rfqId         Int?
+  contractId    Int?
+  notes         String?
+
+  rfq      RFQ?      @relation(fields: [rfqId], references: [id], onDelete: SetNull)
+  contract Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  dateRaised                      DateTime?
+  vendorName                      String?
+  vendorSubName                   String?
+  categoryServiceType             String?
+  businessOwner                   String?
+  procurementLead                 String?
+  requestType                     String?
+  requestTypeOther                String?
+  category                        String?
+  estimatedAnnualSpend            Decimal?
+  riskRating                      String    @default("UNASSIGNED")
+  currentStage                    String?
+  finalDecision                   String    @default("PENDING")
+  currentAction                   String?
+  actionOwner                     String?
+  actionDueDate                   DateTime?
+  actionStatus                    String    @default("NOT_STARTED")
+  targetGoLiveDate                DateTime?
+  actualGoLiveDate                DateTime?
+  createdBy                       String?
+  lastUpdatedBy                   String?
+  businessRequirementFinalised    DateTime?
+  initialReviewCompleted          DateTime?
+  budgetApproval                  DateTime?
+  rfqCompletion                   DateTime?
+  riskClassificationCompleted     DateTime?
+  dueDiligenceCompleted           DateTime?
+  outsourcingDetermination        DateTime?
+  outsourcingAssessmentCompletion DateTime?
+  finalDecisionDate               DateTime?
+  contractSignature               DateTime?
+  setupCompletion                 DateTime?
+  outsourcingClassification       String?
+  updatedAt                       DateTime  @updatedAt
+
+  reviews  RiskReview[]
+  actions  ProcurementAction[]
+  decision FinalDecision?
+  history  HistoryEvent[]
+}
+
+model RiskReview {
+  id                     Int       @id @default(autoincrement())
+  requestId              Int
+  riskFunction           String
+  reviewRequired         String    @default("TO_BE_DETERMINED")
+  reviewStatus           String    @default("NOT_SENT")
+  dateSent               DateTime?
+  responseDate           DateTime?
+  outcome                String    @default("PENDING")
+  reviewer               String?
+  comments               String?
+  conditions             String?
+  followUpActionRequired Boolean   @default(false)
+  actionOwner            String?
+  actionDueDate          DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  request ProcurementRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actions ProcurementAction[]
+
+  @@unique([requestId, riskFunction])
+}
+
+model ProcurementAction {
+  id        Int       @id @default(autoincrement())
+  requestId Int
+  reviewId  Int?
+  action    String
+  owner     String?
+  dueDate   DateTime?
+  status    String    @default("NOT_STARTED")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  request ProcurementRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  review  RiskReview?        @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+}
+
+model FinalDecision {
+  id             Int       @id @default(autoincrement())
+  requestId      Int       @unique
+  decision       String    @default("PENDING")
+  decisionDate   DateTime?
+  decisionBy     String?
+  reasonCategory String?
+  comments       String?
+  conditions     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  request ProcurementRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model HistoryEvent {
+  id            Int      @id @default(autoincrement())
+  requestId     Int
+  eventType     String
+  changedBy     String?
+  previousValue String?
+  newValue      String?
+  createdAt     DateTime @default(now())
+
+  request ProcurementRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model PresetValue {
+  id        Int      @id @default(autoincrement())
+  fieldName String
+  value     String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fieldName, value])
+}
+
+model ContractItem {
+  id         Int      @id @default(autoincrement())
+  contractId Int
+  productId  Int
+  quantity   Int?
+  unitPrice  Decimal?
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model PurchaseOrder {
+  id           Int       @id @default(autoincrement())
+  vendorId     Int
+  contractId   Int
+  poDate       DateTime  @default(now())
+  requestedBy  String
+  approver     String
+  currency     String
+  totalAmount  Decimal?
+  status       String
+  deliveryDate DateTime?
+  notes        String?
+
+  vendor   Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  contract Contract            @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  lines    PurchaseOrderLine[]
+}
+
+model PurchaseOrderLine {
+  id              Int     @id @default(autoincrement())
+  purchaseOrderId Int
+  productId       Int
+  quantity        Int
+  unitPrice       Decimal
+  currency        String
+  lineTotal       Decimal
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+}

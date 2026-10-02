@@ -1,0 +1,14 @@
+{
+  "name": "vendor-management-system",
+  "private": true,
+  "scripts": {
+    "start": "concurrently --kill-others-on-fail --names backend,frontend,browser --prefix-colors blue,green,yellow \"PORT=5002 npm --prefix backend start\" \"npm --prefix frontend run dev -- --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && open -a 'Google Chrome' http://127.0.0.1:5173\"",
+    "dev": "npm start",
+    "seed": "npm --prefix backend run seed",
+    "build": "npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "wait-on": "^8.0.3"
+  }
+}
